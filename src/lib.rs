@@ -2,16 +2,16 @@ use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_uint};
 use image::{imageops::FilterType, GenericImageView, ImageError};
 
-/// Pomocná funkce pro načtení Rust stringu z C ukazatele
-fn get_str_from_ptr(ptr: *const c_char) -> Result<&'static str, ()> {
+#[inline]
+fn get_str_from_ptr(ptr: *const c_char) -> Option<&'static str> {
     if ptr.is_null() {
-        return Err(());
+        return None;
     }
-    let cstr = unsafe { CStr::from_ptr(ptr) };
-    cstr.to_str().map_err(|_| ())
+    unsafe {
+        CStr::from_ptr(ptr).to_str().ok()
+    }
 }
 
-/// Funkce pro změnu velikosti JPEG podle absolutní velikosti
 #[no_mangle]
 pub extern "C" fn resize_jpeg_ffi(
     input_path: *const c_char,
@@ -19,13 +19,12 @@ pub extern "C" fn resize_jpeg_ffi(
     new_width: c_uint,
     new_height: c_uint,
 ) -> c_int {
-    let input = match get_str_from_ptr(input_path) {
-        Ok(s) => s,
-        Err(_) => return -1,
-    };
-    let output = match get_str_from_ptr(output_path) {
-        Ok(s) => s,
-        Err(_) => return -1,
+    let (input, output) = match (
+        get_str_from_ptr(input_path),
+        get_str_from_ptr(output_path),
+    ) {
+        (Some(i), Some(o)) => (i, o),
+        _ => return -1,
     };
 
     match resize_jpeg(input, output, new_width, new_height) {
@@ -34,28 +33,26 @@ pub extern "C" fn resize_jpeg_ffi(
     }
 }
 
-/// Nová funkce pro změnu velikosti JPEG podle procent
 #[no_mangle]
 pub extern "C" fn resize_jpeg_percent_ffi(
     input_path: *const c_char,
     output_path: *const c_char,
-    percent: c_uint, // 100 = 100 %, 50 = poloviční, 200 = dvojnásobek
+    percent: c_uint,
 ) -> c_int {
-    let input = match get_str_from_ptr(input_path) {
-        Ok(s) => s,
-        Err(_) => return -1,
-    };
-    let output = match get_str_from_ptr(output_path) {
-        Ok(s) => s,
-        Err(_) => return -1,
+    let (input, output) = match (
+        get_str_from_ptr(input_path),
+        get_str_from_ptr(output_path),
+    ) {
+        (Some(i), Some(o)) => (i, o),
+        _ => return -1,
     };
 
     let img = match image::open(input) {
         Ok(i) => i,
         Err(_) => return -1,
     };
-    let (orig_w, orig_h) = img.dimensions();
 
+    let (orig_w, orig_h) = img.dimensions();
     let scale = percent as f32 / 100.0;
     let new_w = (orig_w as f32 * scale).round() as u32;
     let new_h = (orig_h as f32 * scale).round() as u32;
@@ -66,7 +63,6 @@ pub extern "C" fn resize_jpeg_percent_ffi(
     }
 }
 
-/// Nová funkce pro zjištění rozměrů JPEG obrázku
 #[no_mangle]
 pub extern "C" fn get_jpeg_dimensions_ffi(
     input_path: *const c_char,
@@ -78,16 +74,16 @@ pub extern "C" fn get_jpeg_dimensions_ffi(
     }
 
     let input = match get_str_from_ptr(input_path) {
-        Ok(s) => s,
-        Err(_) => return -1,
+        Some(s) => s,
+        None => return -1,
     };
 
     let img = match image::open(input) {
         Ok(i) => i,
         Err(_) => return -1,
     };
-    let (w, h) = img.dimensions();
 
+    let (w, h) = img.dimensions();
     unsafe {
         *out_width = w;
         *out_height = h;
@@ -96,7 +92,6 @@ pub extern "C" fn get_jpeg_dimensions_ffi(
     0
 }
 
-/// Interní resize funkce
 fn resize_jpeg(
     input_path: &str,
     output_path: &str,
@@ -104,7 +99,7 @@ fn resize_jpeg(
     new_height: u32,
 ) -> Result<(), ImageError> {
     let img = image::open(input_path)?;
-    let resized = img.resize(new_width, new_height, FilterType::CatmullRom);
+    let resized = img.resize(new_width, new_height, FilterType::Lanczos3);
     resized.save(output_path)?;
     Ok(())
 }
