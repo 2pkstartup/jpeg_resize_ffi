@@ -2,16 +2,25 @@
 name = "jpeg_resize_ffi"
 version = "0.1.0"
 edition = "2021"
-
-[lib]
-crate-type = ["cdylib"]
+# (volitelně můžeš přidat):
+authors = ["2pkstartup@gmail.com"]
+description = "Safe image resizing library for FFI use"
+license = "MIT"
 
 [dependencies]
-image = "0.25"
-libc = "0.2"
+image = "0.24"
+
+[lib]
+crate-type = ["cdylib"]  # Pro FFI knihovnu (např. DLL)
+
+[build-dependencies]
+embed-resource = "2"
 
 [profile.release]
-opt-level = "z"
-lto = true
-strip = true
-panic = "abort"
+opt-level = 0          # optimalizace pro velikost (lepší pro AV)
+lto = false              # LTO může produkovat složitější binárky
+codegen-units = 1        # lepší determinismus (méně podezřelý)
+panic = "abort"          # žádné stacktrace v chybách
+strip = false             # odstraní symboly pro ladění
+debug = false            # odstraní metadata pro debug
+

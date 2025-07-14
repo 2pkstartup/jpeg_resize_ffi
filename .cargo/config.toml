@@ -1,0 +1,11 @@
+[build]
+target = "x86_64-pc-windows-msvc"  # nebo gnu pokud používáš MinGW
+
+rustflags = [
+  "--cap-lints=warn",
+  "-C", "target-cpu=generic",
+  "-C", "opt-level=2",
+  "-C", "codegen-units=1",
+  "-C", "lto=no",
+  "-C", "debuginfo=0"
+]
